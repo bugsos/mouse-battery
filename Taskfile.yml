@@ -1,0 +1,45 @@
+version: '3'
+
+tasks:
+  default:
+    desc: 查看常用命令
+    cmds:
+      - task --list
+
+  dev:
+    desc: 从源码运行桌面应用
+    env:
+      CGO_ENABLED: '{{if eq OS "darwin"}}1{{else}}0{{end}}'
+    cmds:
+      - go run .
+
+  probe:
+    desc: 在终端列出每只已识别鼠标及其实测电量
+    env:
+      CGO_ENABLED: '0'
+    cmds:
+      - go run ./cmd/probe
+
+  test:
+    desc: 运行单元测试
+    env:
+      CGO_ENABLED: '{{if eq OS "darwin"}}1{{else}}0{{end}}'
+    cmds:
+      - go test ./...
+
+  build:
+    desc: 为当前系统生成可分发的程序到 bin/
+    cmds:
+      - task: 'build:{{OS}}'
+
+  build:windows:
+    internal: true
+    env:
+      CGO_ENABLED: '0'
+    cmds:
+      - go build -trimpath -buildvcs=false -ldflags="-s -w -H windowsgui" -o bin/mouse-battery.exe .
+
+  build:darwin:
+    internal: true
+    cmds:
+      - sh scripts/build-macos.sh
