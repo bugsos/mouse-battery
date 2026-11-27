@@ -135,6 +135,8 @@ type winApp struct {
 	tray           *winTray
 	overlay        *winOverlay
 	taskbarCreated uint32
+	autoStart      bool
+	shortcut       bool
 	state          battery.Snapshot
 	view           ViewState
 
@@ -187,6 +189,8 @@ func Run(monitor *battery.Monitor) error {
 		tray:           newWinTray(hostHWND),
 		overlay:        overlay,
 		taskbarCreated: uint32(taskbarCreated),
+		autoStart:      isAutoStartEnabled(),
+		shortcut:       isDesktopShortcutEnabled(),
 	}
 	activeWinApp = app
 	defer func() {
@@ -326,12 +330,49 @@ func (a *winApp) present(s battery.Snapshot) {
 }
 
 func (a *winApp) refreshView(redraw bool) {
-	a.view = buildViewState(a.state, true, a.overlay.visible)
+	a.view = buildViewState(a.state, uiOptions{
+		hasOverlay:     true,
+		overlayVisible: a.overlay.visible,
+		hasAutoStart:   true,
+		autoStart:      a.autoStart,
+		hasShortcut:    true,
+		shortcut:       a.shortcut,
+	})
 	if !redraw {
 		return
 	}
 	_ = a.tray.update(a.view)
 	_ = a.overlay.draw(a.view, nil)
+}
+
+func (a *winApp) syncSystemState() {
+	autoStart := isAutoStartEnabled()
+	shortcut := isDesktopShortcutEnabled()
+	if autoStart != a.autoStart || shortcut != a.shortcut {
+		a.autoStart = autoStart
+		a.shortcut = shortcut
+		a.refreshView(false)
+	}
+}
+
+func (a *winApp) toggleAutoStart() {
+	next := !a.autoStart
+	if err := setAutoStart(next); err != nil {
+		a.autoStart = isAutoStartEnabled()
+	} else {
+		a.autoStart = next
+	}
+	a.refreshView(false)
+}
+
+func (a *winApp) toggleShortcut() {
+	next := !a.shortcut
+	if err := setDesktopShortcut(next); err != nil {
+		a.shortcut = isDesktopShortcutEnabled()
+	} else {
+		a.shortcut = next
+	}
+	a.refreshView(false)
 }
 
 func (a *winApp) setOverlayVisible(show bool) {
@@ -356,6 +397,10 @@ func (a *winApp) handleMenuCommand(items []MenuItem, cmd uint32) {
 		a.setOverlayVisible(!a.overlay.visible)
 	case ActionHideOverlay:
 		a.setOverlayVisible(false)
+	case ActionToggleAutoStart:
+		a.toggleAutoStart()
+	case ActionToggleShortcut:
+		a.toggleShortcut()
 	case ActionQuit:
 		a.quit()
 	}
@@ -389,6 +434,7 @@ func hostProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 	case wmAppTray:
 		event := uint32(lParam & 0xFFFF)
 		if event == wmLButtonUp || event == wmRButtonUp || event == wmContextMenu {
+			app.syncSystemState()
 			items := app.view.TrayMenu
 			cmd := showPopupMenu(app.hostHWND, items)
 			app.handleMenuCommand(items, cmd)
@@ -415,6 +461,7 @@ func overlayProc(hwnd uintptr, msg uint32, wParam, lParam uintptr) uintptr {
 		app.overlay.beginDrag()
 		return 0
 	case wmRButtonUp:
+		app.syncSystemState()
 		items := app.view.BallMenu
 		cmd := showPopupMenu(app.hostHWND, items)
 		app.handleMenuCommand(items, cmd)

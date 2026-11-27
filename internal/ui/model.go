@@ -25,6 +25,8 @@ const (
 	ActionRefresh
 	ActionToggleOverlay
 	ActionHideOverlay
+	ActionToggleAutoStart
+	ActionToggleShortcut
 	ActionQuit
 )
 
@@ -39,6 +41,15 @@ type MenuItem struct {
 	Device  battery.Entry
 }
 
+type uiOptions struct {
+	hasOverlay     bool
+	overlayVisible bool
+	hasAutoStart   bool
+	autoStart      bool
+	hasShortcut    bool
+	shortcut       bool
+}
+
 type ViewState struct {
 	Tooltip   string
 	TrayText  string
@@ -48,7 +59,7 @@ type ViewState struct {
 	BallMenu  []MenuItem
 }
 
-func buildViewState(s battery.Snapshot, hasOverlay, overlayVisible bool) ViewState {
+func buildViewState(s battery.Snapshot, opts uiOptions) ViewState {
 	nextID := firstMenuID
 	allocID := func() uint32 {
 		id := nextID
@@ -86,24 +97,60 @@ func buildViewState(s battery.Snapshot, hasOverlay, overlayVisible bool) ViewSta
 		MenuItem{Kind: MenuSeparator},
 		MenuItem{ID: allocID(), Kind: MenuAction, Label: "立即刷新", Action: ActionRefresh},
 	)
-	if hasOverlay {
+	if opts.hasOverlay {
 		trayMenu = append(trayMenu, MenuItem{
 			ID:      allocID(),
 			Kind:    MenuCheck,
 			Label:   "桌面悬浮球",
-			Checked: overlayVisible,
+			Checked: opts.overlayVisible,
 			Action:  ActionToggleOverlay,
+		})
+	}
+	if opts.hasAutoStart {
+		trayMenu = append(trayMenu, MenuItem{
+			ID:      allocID(),
+			Kind:    MenuCheck,
+			Label:   "开机启动",
+			Checked: opts.autoStart,
+			Action:  ActionToggleAutoStart,
+		})
+	}
+	if opts.hasShortcut {
+		trayMenu = append(trayMenu, MenuItem{
+			ID:      allocID(),
+			Kind:    MenuCheck,
+			Label:   "桌面快捷方式",
+			Checked: opts.shortcut,
+			Action:  ActionToggleShortcut,
 		})
 	}
 	trayMenu = append(trayMenu, MenuItem{ID: allocID(), Kind: MenuAction, Label: "退出", Action: ActionQuit})
 
 	var ballMenu []MenuItem
-	if hasOverlay {
-		ballMenu = []MenuItem{
-			{ID: allocID(), Kind: MenuAction, Label: "立即刷新", Action: ActionRefresh},
-			{ID: allocID(), Kind: MenuAction, Label: "隐藏悬浮球", Action: ActionHideOverlay},
-			{ID: allocID(), Kind: MenuAction, Label: "退出", Action: ActionQuit},
+	if opts.hasOverlay {
+		ballMenu = append(ballMenu,
+			MenuItem{ID: allocID(), Kind: MenuAction, Label: "立即刷新", Action: ActionRefresh},
+			MenuItem{ID: allocID(), Kind: MenuAction, Label: "隐藏悬浮球", Action: ActionHideOverlay},
+		)
+		if opts.hasAutoStart {
+			ballMenu = append(ballMenu, MenuItem{
+				ID:      allocID(),
+				Kind:    MenuCheck,
+				Label:   "开机启动",
+				Checked: opts.autoStart,
+				Action:  ActionToggleAutoStart,
+			})
 		}
+		if opts.hasShortcut {
+			ballMenu = append(ballMenu, MenuItem{
+				ID:      allocID(),
+				Kind:    MenuCheck,
+				Label:   "桌面快捷方式",
+				Checked: opts.shortcut,
+				Action:  ActionToggleShortcut,
+			})
+		}
+		ballMenu = append(ballMenu, MenuItem{ID: allocID(), Kind: MenuAction, Label: "退出", Action: ActionQuit})
 	}
 
 	return ViewState{

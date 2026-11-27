@@ -29,9 +29,10 @@ type darwinApp struct {
 	ctx     context.Context
 	cancel  context.CancelFunc
 
-	mu    sync.Mutex
-	state battery.Snapshot
-	view  ViewState
+	mu        sync.Mutex
+	autoStart bool
+	state     battery.Snapshot
+	view      ViewState
 }
 
 var (
@@ -42,9 +43,10 @@ var (
 func Run(monitor *battery.Monitor) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	app := &darwinApp{
-		monitor: monitor,
-		ctx:     ctx,
-		cancel:  cancel,
+		monitor:   monitor,
+		ctx:       ctx,
+		cancel:    cancel,
+		autoStart: isAutoStartEnabled(),
 	}
 
 	darwinMu.Lock()
@@ -100,10 +102,30 @@ func goDarwinMenuClick(itemID C.uint32_t) {
 		app.monitor.Select(item.Device)
 	case ActionRefresh:
 		app.monitor.Refresh()
+	case ActionToggleAutoStart:
+		app.toggleAutoStart()
 	case ActionQuit:
 		app.cancel()
 		C.mb_quit()
 	}
+}
+
+func (a *darwinApp) toggleAutoStart() {
+	a.mu.Lock()
+	next := !a.autoStart
+	a.mu.Unlock()
+
+	if err := setAutoStart(next); err != nil {
+		next = isAutoStartEnabled()
+	}
+
+	a.mu.Lock()
+	a.autoStart = next
+	vs := buildViewState(a.state, uiOptions{hasAutoStart: true, autoStart: a.autoStart})
+	a.view = vs
+	a.mu.Unlock()
+
+	a.pushView(vs)
 }
 
 func (a *darwinApp) present(s battery.Snapshot) {
@@ -113,10 +135,14 @@ func (a *darwinApp) present(s battery.Snapshot) {
 		return
 	}
 	a.state = s
-	vs := buildViewState(s, false, false)
+	vs := buildViewState(s, uiOptions{hasAutoStart: true, autoStart: a.autoStart})
 	a.view = vs
 	a.mu.Unlock()
 
+	a.pushView(vs)
+}
+
+func (a *darwinApp) pushView(vs ViewState) {
 	cTitle := C.CString(vs.BadgeText)
 	cTooltip := C.CString(vs.Tooltip)
 	defer C.free(unsafe.Pointer(cTitle))

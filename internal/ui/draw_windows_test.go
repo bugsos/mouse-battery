@@ -30,7 +30,7 @@ func TestWindowsGDIPlusRenderOverlayAndTray(t *testing.T) {
 
 	for _, dpi := range []uint32{96, 144, 192} {
 		for _, snap := range snaps {
-			vs := buildViewState(snap, true, true)
+			vs := buildViewState(snap, uiOptions{hasOverlay: true, overlayVisible: true})
 			surf, err := renderOverlayDIB(vs, dpi)
 			if err != nil {
 				t.Fatalf("renderOverlayDIB(%q, dpi=%d) error: %v", vs.BadgeText, dpi, err)
@@ -65,7 +65,7 @@ func TestWindowsGDIPlusRenderOverlayAndTray(t *testing.T) {
 
 	for _, size := range []int32{16, 20, 24, 32} {
 		for _, snap := range snaps {
-			vs := buildViewState(snap, true, true)
+			vs := buildViewState(snap, uiOptions{hasOverlay: true, overlayVisible: true})
 			hicon, err := renderTrayHICON(vs, size)
 			if err != nil {
 				t.Fatalf("renderTrayHICON(%q, size=%d) error: %v", vs.TrayText, size, err)
@@ -106,7 +106,7 @@ func exportPreviewSheet(t *testing.T, snaps []battery.Snapshot, outPath string) 
 	for _, dpi := range dpis {
 		xOff := 14
 		for _, snap := range snaps {
-			vs := buildViewState(snap, true, true)
+			vs := buildViewState(snap, uiOptions{hasOverlay: true, overlayVisible: true})
 			surf, err := renderOverlayDIB(vs, dpi)
 			if err != nil {
 				t.Fatal(err)
@@ -125,7 +125,7 @@ func exportPreviewSheet(t *testing.T, snaps []battery.Snapshot, outPath string) 
 		x1 := 14
 		x2 := 260
 		for _, snap := range snaps {
-			vs := buildViewState(snap, true, true)
+			vs := buildViewState(snap, uiOptions{hasOverlay: true, overlayVisible: true})
 			surf, err := createDIBSurface(size, size)
 			if err != nil {
 				t.Fatal(err)

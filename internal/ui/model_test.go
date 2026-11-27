@@ -88,7 +88,14 @@ func TestBuildViewStateDuplicateDevicesAndMenus(t *testing.T) {
 		Percent:  85,
 	}
 
-	vs := buildViewState(snap, true, true)
+	vs := buildViewState(snap, uiOptions{
+		hasOverlay:     true,
+		overlayVisible: true,
+		hasAutoStart:   true,
+		autoStart:      true,
+		hasShortcut:    true,
+		shortcut:       true,
+	})
 	if vs.Tooltip != "VK M3 Lite · 85%" {
 		t.Fatalf("Tooltip = %q", vs.Tooltip)
 	}
@@ -97,7 +104,7 @@ func TestBuildViewStateDuplicateDevicesAndMenus(t *testing.T) {
 	}
 
 	var radios []MenuItem
-	var hasOverlayToggle bool
+	var hasOverlayToggle, hasTrayAutoStart, hasBallAutoStart, hasTrayShortcut, hasBallShortcut bool
 	for _, item := range vs.TrayMenu {
 		if item.Kind == MenuRadio {
 			radios = append(radios, item)
@@ -106,6 +113,18 @@ func TestBuildViewStateDuplicateDevicesAndMenus(t *testing.T) {
 			hasOverlayToggle = true
 			if !item.Checked {
 				t.Fatalf("expected overlay toggle checked")
+			}
+		}
+		if item.Kind == MenuCheck && item.Action == ActionToggleAutoStart {
+			hasTrayAutoStart = true
+			if !item.Checked {
+				t.Fatalf("expected tray auto-start checked")
+			}
+		}
+		if item.Kind == MenuCheck && item.Action == ActionToggleShortcut {
+			hasTrayShortcut = true
+			if !item.Checked {
+				t.Fatalf("expected tray shortcut checked")
 			}
 		}
 	}
@@ -124,19 +143,49 @@ func TestBuildViewStateDuplicateDevicesAndMenus(t *testing.T) {
 	if !hasOverlayToggle {
 		t.Fatalf("missing overlay toggle menu item")
 	}
-	if len(vs.BallMenu) != 3 {
-		t.Fatalf("BallMenu len = %d, want 3", len(vs.BallMenu))
+	if !hasTrayAutoStart {
+		t.Fatalf("missing tray auto-start menu item")
+	}
+	if !hasTrayShortcut {
+		t.Fatalf("missing tray shortcut menu item")
+	}
+	if len(vs.BallMenu) != 5 {
+		t.Fatalf("BallMenu len = %d, want 5", len(vs.BallMenu))
+	}
+	for _, item := range vs.BallMenu {
+		if item.Kind == MenuCheck && item.Action == ActionToggleAutoStart && item.Checked {
+			hasBallAutoStart = true
+		}
+		if item.Kind == MenuCheck && item.Action == ActionToggleShortcut && item.Checked {
+			hasBallShortcut = true
+		}
+	}
+	if !hasBallAutoStart {
+		t.Fatalf("missing checked auto-start item in BallMenu")
+	}
+	if !hasBallShortcut {
+		t.Fatalf("missing checked shortcut item in BallMenu")
 	}
 
-	// Verify macOS mode (hasOverlay = false)
-	macVS := buildViewState(snap, false, false)
+	// Verify macOS mode (hasOverlay = false, hasAutoStart = true)
+	macVS := buildViewState(snap, uiOptions{hasAutoStart: true, autoStart: false})
 	if len(macVS.BallMenu) != 0 {
 		t.Fatalf("macOS should have empty BallMenu")
 	}
+	var hasMacAutoStart bool
 	for _, item := range macVS.TrayMenu {
 		if item.Action == ActionToggleOverlay {
 			t.Fatalf("macOS tray menu should not have overlay toggle")
 		}
+		if item.Kind == MenuCheck && item.Action == ActionToggleAutoStart {
+			hasMacAutoStart = true
+			if item.Checked {
+				t.Fatalf("expected macOS auto-start unchecked")
+			}
+		}
+	}
+	if !hasMacAutoStart {
+		t.Fatalf("missing macOS auto-start menu item")
 	}
 }
 
